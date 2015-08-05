@@ -71,15 +71,24 @@ _isequalelms(a::PooledDataArray, i::Int, j::Int) = isequal(a.refs[i], a.refs[j])
 # rows are equal if they have the same values (while the row indices could differ)
 function Base.isequal(r1::DataFrameRow, r2::DataFrameRow)
     if r1.df !== r2.df
-        throw(ArgumentError("Comparing rows from different frames not supported"))
-    end
-    if r1.row == r2.row
+        if ncol(r1.df) != ncol(r2.df)
+          throw(ArgumentError("Rows of the data frames that have different number of columns cannot be compared"))
+        end
+        for i in 1:ncol(r1.df)
+          if !isequal(r1[i], r2[i])
+            return false
+          end
+        end
+        return true
+    elseif r1.row == r2.row
+        return true
+    else
+        # rows from the same frame
+        for col in columns(r1.df)
+            if !_isequalelms(col, r1.row, r2.row)
+                return false
+            end
+        end
         return true
     end
-    for col in columns(r1.df)
-        if !_isequalelms(col, r1.row, r2.row)
-            return false
-        end
-    end
-    return true
 end
