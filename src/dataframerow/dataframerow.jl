@@ -51,7 +51,7 @@ function Base.hash(r::DataFrameRow, h::UInt)
 end
 
 # compare two elements in the array
-_isequalelms(a::Array, i::Int, j::Int) = isequal(a[i], a[j])
+_isequalelms(a::AbstractArray, i::Int, j::Int) = isequal(a[i], a[j])
 
 # compare the two elements in the data array
 function _isequalelms(a::DataArray, i::Int, j::Int)
