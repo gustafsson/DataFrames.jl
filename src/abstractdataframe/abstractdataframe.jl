@@ -573,9 +573,9 @@ nonunique(df)
 ```
 
 """
-function nonunique(df::AbstractDataFrame)
+function nonunique{DF<:AbstractDataFrame}(df::DF)
     res = fill(false, nrow(df))
-    rows = Set{DataFrameRow}()
+    rows = Set{DataFrameRow{DF}}()
     for i in 1:nrow(df)
         arow = DataFrameRow(df, i)
         if in(arow, rows)
