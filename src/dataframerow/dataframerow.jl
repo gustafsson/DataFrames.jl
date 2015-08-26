@@ -40,11 +40,12 @@ Base.convert(::Type{Array}, r::DataFrameRow) = convert(Array, r.df[r.row,:])
 # hash of DataFrame rows based on its values
 # so that duplicate rows would have the same hash
 function Base.hash(r::DataFrameRow, h::UInt)
+    rix = r.row
     for col in columns(r.df)
-        if isna(col, r.row)
+        if isna(col, rix)
             h = hash(false, h)
         else
-            h = hash(true, hash(col[r.row], h))
+            h = hash(true, hash(col[rix], h))
         end
     end
     return h
@@ -84,8 +85,10 @@ function Base.isequal(r1::DataFrameRow, r2::DataFrameRow)
         return true
     else
         # rows from the same frame
+        r1ix = r1.row
+        r2ix = r2.row
         for col in columns(r1.df)
-            if !_isequalelms(col, r1.row, r2.row)
+            if !_isequalelms(col, r1ix, r2ix)
                 return false
             end
         end
