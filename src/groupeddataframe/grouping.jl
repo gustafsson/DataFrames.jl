@@ -81,13 +81,14 @@ df |> groupby([:a, :b]) |> [sum, length]
 ```
 
 """
-function groupby{T}(d::AbstractDataFrame, cols::Vector{T})
-    d_groups = _group_rows(d[cols])
+function groupby{T}(df::AbstractDataFrame, cols::Vector{T})
+    sdf = df[cols]
+    df_groups = _group_rows(sdf)
     # sort the groups
-    d_group_perm = sortperm(d[d_groups.rperm[d_groups.starts], cols])
-    GroupedDataFrame(d, cols, d_groups.rperm,
-                     d_groups.starts[d_group_perm],
-                     d_groups.stops[d_group_perm])
+    group_perm = sortperm(sub(sdf, df_groups.rperm[df_groups.starts]))
+    GroupedDataFrame(df, cols, df_groups.rperm,
+                     df_groups.starts[group_perm],
+                     df_groups.stops[group_perm])
 end
 groupby(d::AbstractDataFrame, cols) = groupby(d, [cols])
 
