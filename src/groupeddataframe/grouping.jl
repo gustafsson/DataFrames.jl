@@ -36,7 +36,7 @@ groupby(cols)
 ### Arguments
 
 * `d` : an AbstractDataFrame
-* `cols` : an 
+* `cols` : data frame columns to group by
 
 If `d` is not provided, a curried version of groupby is given.
 
@@ -82,32 +82,12 @@ df |> groupby([:a, :b]) |> [sum, length]
 
 """
 function groupby{T}(d::AbstractDataFrame, cols::Vector{T})
-    ## a subset of Wes McKinney's algorithm here:
-    ##     http://wesmckinney.com/blog/?p=489
-
-    ncols = length(cols)
-    # use the pool trick to get a set of integer references for each unique item
-    dv = PooledDataArray(d[cols[ncols]])
-    # if there are NAs, add 1 to the refs to avoid underflows in x later
-    dv_has_nas = (findfirst(dv.refs, 0) > 0 ? 1 : 0)
-    x = copy(dv.refs) .+ dv_has_nas
-    # also compute the number of groups, which is the product of the set lengths
-    ngroups = length(dv.pool) + dv_has_nas
-    # if there's more than 1 column, do roughly the same thing repeatedly
-    for j = (ncols - 1):-1:1
-        dv = PooledDataArray(d[cols[j]])
-        dv_has_nas = (findfirst(dv.refs, 0) > 0 ? 1 : 0)
-        for i = 1:nrow(d)
-            x[i] += (dv.refs[i] + dv_has_nas- 1) * ngroups
-        end
-        ngroups = ngroups * (length(dv.pool) + dv_has_nas)
-        # TODO if ngroups is really big, shrink it
-    end
-    (idx, starts) = DataArrays.groupsort_indexer(x, ngroups)
-    # Remove zero-length groupings
-    starts = _uniqueofsorted(starts)
-    ends = starts[2:end] - 1
-    GroupedDataFrame(d, cols, idx, starts[1:end-1], ends)
+    d_groups = _group_rows(d[cols])
+    # sort the groups
+    d_group_perm = sortperm(d[d_groups.row_ixs[d_groups.starts], cols])
+    GroupedDataFrame(d, cols, d_groups.row_ixs,
+                     d_groups.starts[d_group_perm],
+                     d_groups.stops[d_group_perm])
 end
 groupby(d::AbstractDataFrame, cols) = groupby(d, [cols])
 
@@ -284,7 +264,7 @@ notation can be used.
 
 ### Returns
 
-* `::DataFrame` 
+* `::DataFrame`
 
 ### Examples
 
@@ -330,7 +310,7 @@ same length.
 
 ### Returns
 
-* `::DataFrame` 
+* `::DataFrame`
 
 ### Examples
 
