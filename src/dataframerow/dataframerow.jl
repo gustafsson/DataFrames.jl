@@ -92,3 +92,26 @@ function Base.isequal(r1::DataFrameRow, r2::DataFrameRow)
         return true
     end
 end
+
+# lexicographic ordering on DataFrame rows, NA < !NA
+function Base.isless(r1::DataFrameRow, r2::DataFrameRow)
+  if ncol(r1.df) != ncol(r2.df)
+    throw(ArgumentError("Rows of the data frames that have different number of columns cannot be compared"))
+  end
+  for i in 1:ncol(r1.df)
+    col1 = r1.df[i]
+    col2 = r2.df[i]
+    isna1 = isna(col1, r1.row)
+    isna2 = isna(col2, r2.row)
+    if isna1 != isna2
+      return isna1 # NA < !NA
+    elseif !isna1
+      if isless(col1[r1.row], col2[r2.row])
+        return true
+      elseif !isequal(col1[r1.row], col2[r2.row])
+        return false
+      end
+    end
+  end
+  return false
+end
