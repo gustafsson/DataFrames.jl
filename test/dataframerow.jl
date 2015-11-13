@@ -68,6 +68,10 @@ module TestDataFrameRow
     @test !isequal(hash(DataFrameRow(df, 2)), hash(DataFrameRow(df2, 1)))
     @test isequal(hash(DataFrameRow(df, 2)), hash(DataFrameRow(df2, 5)))
 
+    # check that hashrows() function generates the same hashes as DataFrameRow
+    df_rowhashes = DataFrames.hashrows(df)
+    @test df_rowhashes == [hash(dr) for dr in eachrow(df)]
+
     # test incompatible frames
     @test_throws ArgumentError isequal(DataFrameRow(df, 1), DataFrameRow(df3, 1))
 
@@ -79,16 +83,17 @@ module TestDataFrameRow
 
     #test_group("groupby")
     gd = DataFrames._group_rows(df5)
-    @test length(gd) == 2
-    g_keys = sort!(collect(keys(gd)))
-    @test !isempty(gd[g_keys[1]])
-    @test length(gd[g_keys[1]]) + length(gd[g_keys[2]]) == N
+    @test DataFrames.ngroups(gd) == 2
+    #g_keys = sort!(collect(keys(gd)))
+    #@test !isempty(gd[g_keys[1]])
+    #@test length(gd[g_keys[1]]) + length(gd[g_keys[2]]) == N
     # getting groups for the rows of the other frames
     @test length(gd[DataFrameRow(df6, 1)]) > 0
     @test_throws KeyError gd[DataFrameRow(df6, 2)]
-    @test isempty(get(gd, DataFrameRow(df6, 2)))
-    @test length(get(gd, DataFrameRow(df6, 2))) == 0
+    @test isempty(get(gd, df6, 2))
+    @test length(get(gd, df6, 2)) == 0
     # iterating over row group
+#=  disabled, not supported
     c = 0
     for i in gd[g_keys[1]]
       @test 1 <= i <= nrow(df5)
@@ -110,6 +115,7 @@ module TestDataFrameRow
       c += 1
     end
     @test c == 0
+=#
 
     # grouping empty frame
     gd = DataFrames._group_rows(DataFrame(x=Int[]))

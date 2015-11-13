@@ -573,18 +573,17 @@ nonunique(df)
 ```
 
 """
-function nonunique{DF<:AbstractDataFrame}(df::DF)
-    res = fill(false, nrow(df))
-    rows = Set{DataFrameRow{DF}}()
-    for i in 1:nrow(df)
-        arow = DataFrameRow(df, i)
-        if in(arow, rows)
-            res[i] = true
-        else
-            push!(rows, arow)
-        end
+function nonunique(df::AbstractDataFrame)
+    gslots = _row_group_slots(df)[3]
+    # unique rows are the first encountered group representatives,
+    # nonunique are everything else
+    res = fill(true, nrow(df))
+    for g_row in gslots
+      if g_row > 0
+        res[g_row] = false
+      end
     end
-    res
+    return res
 end
 
 unique!(df::AbstractDataFrame) = deleterows!(df, find(nonunique(df)))

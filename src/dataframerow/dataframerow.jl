@@ -40,7 +40,7 @@ Base.convert(::Type{Array}, r::DataFrameRow) = convert(Array, r.df[r.row,:])
 # hash of DataFrame rows based on its values
 # so that duplicate rows would have the same hash
 function rowhash(df::DataFrame, r::Int, h::UInt = zero(UInt))
-    for col in columns(df)
+    @inbounds for col in columns(df)
         if isna(col, r)
             h = hash(false, h)
         else

@@ -84,8 +84,8 @@ df |> groupby([:a, :b]) |> [sum, length]
 function groupby{T}(d::AbstractDataFrame, cols::Vector{T})
     d_groups = _group_rows(d[cols])
     # sort the groups
-    d_group_perm = sortperm(d[d_groups.row_ixs[d_groups.starts], cols])
-    GroupedDataFrame(d, cols, d_groups.row_ixs,
+    d_group_perm = sortperm(d[d_groups.rperm[d_groups.starts], cols])
+    GroupedDataFrame(d, cols, d_groups.rperm,
                      d_groups.starts[d_group_perm],
                      d_groups.stops[d_group_perm])
 end

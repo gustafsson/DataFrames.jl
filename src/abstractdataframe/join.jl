@@ -124,13 +124,13 @@ function _map_rows!(left_frame::AbstractDataFrame, right_frame::AbstractDataFram
 
     # iterate over left rows and compose the left<->right index map
     next_join_ix = 1
-    for l_row in eachrow(left_frame)
-        r_ixs = get(right_dict, l_row)
+    for l_ix in 1:nrow(left_frame)
+        r_ixs = get(right_dict, left_frame, l_ix)
         if isempty(r_ixs)
-            update!(leftonly_ixs, l_row.row, next_join_ix)
+            update!(leftonly_ixs, l_ix, next_join_ix)
             next_join_ix += 1
         else
-            update!(left_ixs, l_row.row, next_join_ix, length(r_ixs))
+            update!(left_ixs, l_ix, next_join_ix, length(r_ixs))
             update!(right_ixs, r_ixs, next_join_ix)
             update!(rightonly_mask, r_ixs)
             next_join_ix += length(r_ixs)
@@ -274,25 +274,25 @@ function Base.join(df1::AbstractDataFrame,
                                    true, true, true, true)...)
     elseif kind == :semi
         # hash the right rows
-        right_rows = _unique_rows(joiner.dfr_on)
+        dfr_on_grp = _group_rows(joiner.dfr_on)
         # iterate over left rows and leave those found in right
         left_ixs = @compat Vector{Int}()
         sizehint!(left_ixs, nrow(joiner.dfl))
-        for l_row in eachrow(joiner.dfl_on)
-            if in(l_row, right_rows)
-                push!(left_ixs, l_row.row)
+        for l_ix in 1:nrow(joiner.dfl_on)
+            if in(dfr_on_grp, joiner.dfl_on, l_ix)
+                push!(left_ixs, l_ix)
             end
         end
         return joiner.dfl[left_ixs, :]
     elseif kind == :anti
         # hash the right rows
-        right_rows = _unique_rows(joiner.dfr_on)
+        dfr_on_grp = _group_rows(joiner.dfr_on)
         # iterate over left rows and leave those not found in right
         leftonly_ixs = @compat Vector{Int}()
         sizehint!(leftonly_ixs, nrow(joiner.dfl))
-        for l_row in eachrow(joiner.dfl_on)
-            if !in(l_row, right_rows)
-                push!(leftonly_ixs, l_row.row)
+        for l_ix in 1:nrow(joiner.dfl_on)
+            if !in(dfr_on_grp, joiner.dfl_on, l_ix)
+                push!(leftonly_ixs, l_ix)
             end
         end
         return joiner.dfl[leftonly_ixs, :]
