@@ -44,6 +44,21 @@ module TestJoin
     @test isequal(join(nameid, jobid, on = :ID, kind = :semi), semi[on])
     @test isequal(join(nameid, jobid, on = :ID, kind = :anti), anti[on])
 
+    # Join using pooled vectors
+    pname = DataFrame(Name = ["John Doe", "Jane Doe", "Joe Blogs"], ID = @pdata([1, 2, 3]))
+    pjob = DataFrame(ID = @pdata([1, 2, 2, 4]), Job = ["Lawyer", "Doctor", "Florist", "Farmer"])
+    pouter = DataFrame(Name = @data(["John Doe", "Jane Doe", "Jane Doe", "Joe Blogs", NA]),
+                      ID = @pdata([1, 2, 2, 3, 4]),
+                      Job = @data(["Lawyer", "Doctor", "Florist", NA, "Farmer"]))
+    pright = pouter[!isna(pouter[:Job]), [:Name, :ID, :Job]]
+    pleft = pouter[!isna(pouter[:Name]), :]
+    pinner = pleft[!isna(pleft[:Job]), :]
+    @test isequal(join(pname, pjob, on = :ID), pinner)
+    @test isequal(join(pname, pjob, on = :ID, kind = :inner), pinner)
+    @test isequal(join(pname, pjob, on = :ID, kind = :outer), pouter)
+    @test isequal(join(pname, pjob, on = :ID, kind = :left), pleft)
+    @test isequal(join(pname, pjob, on = :ID, kind = :right), pright)
+
     # Join on multiple keys
     df1 = DataFrame(A = 1, B = 2, C = 3)
     df2 = DataFrame(A = 1, B = 2, D = 4)
