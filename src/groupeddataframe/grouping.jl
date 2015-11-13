@@ -37,6 +37,7 @@ groupby(cols)
 
 * `d` : an AbstractDataFrame
 * `cols` : data frame columns to group by
+* `sort`: sort row groups (no sorting by default)
 
 If `d` is not provided, a curried version of groupby is given.
 
@@ -81,20 +82,24 @@ df |> groupby([:a, :b]) |> [sum, length]
 ```
 
 """
-function groupby{T}(df::AbstractDataFrame, cols::Vector{T})
+function groupby{T}(df::AbstractDataFrame, cols::Vector{T}; sort::Bool = false)
     sdf = df[cols]
     df_groups = _group_rows(sdf)
     # sort the groups
-    group_perm = sortperm(sub(sdf, df_groups.rperm[df_groups.starts]))
+    if sort
+      group_perm = sortperm(sub(sdf, df_groups.rperm[df_groups.starts]))
+      permute!(df_groups.starts, group_perm)
+      permute!(df_groups.stops, group_perm)
+    end
     GroupedDataFrame(df, cols, df_groups.rperm,
-                     df_groups.starts[group_perm],
-                     df_groups.stops[group_perm])
+                     df_groups.starts,
+                     df_groups.stops)
 end
-groupby(d::AbstractDataFrame, cols) = groupby(d, [cols])
+groupby(d::AbstractDataFrame, cols; sort::Bool = false) = groupby(d, [cols], sort = sort)
 
 # add a function curry
-groupby{T}(cols::Vector{T}) = x -> groupby(x, cols)
-groupby(cols) = x -> groupby(x, cols)
+groupby{T}(cols::Vector{T}; sort::Bool = false) = x -> groupby(x, cols, sort = sort)
+groupby(cols; sort::Bool = false) = x -> groupby(x, cols, sort = sort)
 
 Base.start(gd::GroupedDataFrame) = 1
 Base.next(gd::GroupedDataFrame, state::Int) =
@@ -241,8 +246,8 @@ Split-apply-combine in one step; apply `f` to each grouping in `d`
 based on columns `col`
 
 ```julia
-by(d::AbstractDataFrame, cols, f::Function)
-by(f::Function, d::AbstractDataFrame, cols)
+by(d::AbstractDataFrame, cols, f::Function; sort::Bool = false)
+by(f::Function, d::AbstractDataFrame, cols; sort::Bool = false)
 ```
 
 ### Arguments
@@ -251,6 +256,7 @@ by(f::Function, d::AbstractDataFrame, cols)
 * `cols` : a column indicator (Symbol, Int, Vector{Symbol}, etc.)
 * `f` : a function to be applied to groups; expects each argument to
   be an AbstractDataFrame
+* `sort`: sort row groups (no sorting by default)
 
 `f` can return a value, a vector, or a DataFrame. For a value or
 vector, these are merged into a column along with the `cols` keys. For
@@ -281,8 +287,10 @@ end
 ```
 
 """
-by(d::AbstractDataFrame, cols, f::Function) = combine(map(f, groupby(d, cols)))
-by(f::Function, d::AbstractDataFrame, cols) = by(d, cols, f)
+by(d::AbstractDataFrame, cols, f::Function; sort::Bool = false) =
+  combine(map(f, groupby(d, cols, sort = sort)))
+by(f::Function, d::AbstractDataFrame, cols; sort::Bool = false) =
+  by(d, cols, f, sort = sort)
 
 #
 # Aggregate convenience functions
@@ -342,8 +350,9 @@ Base.(:|>)(gd::GroupedDataFrame, fs::Vector{Function}) = aggregate(gd, fs)
 # Groups DataFrame by cols before applying aggregate
 function aggregate{T <: ColumnIndex}(d::AbstractDataFrame,
                                      cols::@compat(Union{T, AbstractVector{T}}),
-                                     fs::@compat(Union{Function, Vector{Function}}))
-    aggregate(groupby(d, cols), fs)
+                                     fs::@compat(Union{Function, Vector{Function}});
+                                     sort::Bool = false)
+    aggregate(groupby(d, cols, sort = sort), fs)
 end
 
 function _makeheaders(fs::Vector{Function}, cn::Vector{Symbol})
