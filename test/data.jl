@@ -102,15 +102,16 @@ module TestData
     df8 = aggregate(df7[[1, 3]], sum)
     @test df8[1, :d1_sum] == sum(df7[:d1])
 
-    df8 = aggregate(df7, :d2, [sum, length])
+    df8 = aggregate(df7, :d2, [sum, length], sort=true)
+    @test df8[1:2, :d2] == ["A", "B"]
     @test size(df8, 1) == 3
     @test size(df8, 2) == 5
-    @test df8[2, :d1_length] == 4
-    @test isequal(df8, aggregate(groupby(df7, :d2), [sum, length]))
+    @test sum(df8[:d1_length]) == N
+    @test all(df8[:d1_length] .> 0)
+    @test df8[:d1_length] == [4, 5, 11]
+    @test isequal(df8, aggregate(groupby(df7, :d2, sort=true), [sum, length]))
 
-    df9 = df7 |> groupby([:d2]) |> [sum, length]
-    @test isequal(df9, df8)
-    df9 = aggregate(df7, :d2, [sum, length])
+    df9 = df7 |> groupby([:d2], sort=true) |> [sum, length]
     @test isequal(df9, df8)
 
     df10 = DataFrame(
@@ -188,12 +189,13 @@ module TestData
                     b2 = [:A,:B,:C][rand(1:3, 5)],
                     v2 = randn(5))
 
-    m1 = join(df1, df2, on = :a)
-    @test isequal(m1[:a], @data([1, 2, 3, 4, 5]))
+    m1 = join(df1, df2, on = :a, kind=:inner)
+    @test isequal(m1[:a], df1[:a][df1[:a] .<= 5]) # preserves df1 order
+    m2 = join(df1, df2, on = :a, kind = :outer)
+    @test isequal(m2[:a], df1[:a]) # preserves df1 order
+    @test isequal(m2[:b], df1[:b]) # preserves df1 order
     # TODO: Re-enable
-    # m2 = join(df1, df2, on = :a, kind = :outer)
-    # @test isequal(m2[:b2], DataVector["A", "B", "B", "B", "B", NA, NA, NA, NA, NA])
-    # @test isequal(m2[:b2], DataVector["B", "B", "B", "C", "B", NA, NA, NA, NA, NA])
+    #@test isequal(m2[:b2], @data(["B", "B", "B", "C", "B", NA, NA, NA, NA, NA]))
 
     df1 = DataFrame(a = [1, 2, 3],
                     b = ["America", "Europe", "Africa"])
@@ -223,11 +225,11 @@ module TestData
 
     m1 = join(df1, df2, on = :A)
     @test size(m1) == (3,3)
-    @test isequal(m1[:A], @data([NA,"a","a"]))
+    @test isequal(m1[:A], @data(["a","a",NA]))
 
     m2 = join(df1, df2, on = :A, kind = :outer)
     @test size(m2) == (5,3)
-    @test isequal(m2[:A], @data([NA,"a","a","b","c"]))
+    @test isequal(m2[:A], @data(["a","b","a",NA,"c"]))
 
     srand(1)
     df1 = DataFrame(

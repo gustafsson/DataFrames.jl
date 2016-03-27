@@ -2,27 +2,26 @@ module TestJoin
     using Base.Test
     using DataFrames
 
-    name = DataFrame(ID = [1, 2, 3], Name = ["John Doe", "Jane Doe", "Joe Blogs"])
+    name = DataFrame(Name = ["John Doe", "Jane Doe", "Joe Blogs"], ID = [1, 2, 3])
     job = DataFrame(ID = [1, 2, 2, 4], Job = ["Lawyer", "Doctor", "Florist", "Farmer"])
 
     # Join on symbols or vectors of symbols
     join(name, job, on = :ID)
     join(name, job, on = [:ID])
-
-    # Soon we won't allow natural joins
-    #@test_throws join(name, job)
+    # on is requied for any join except :cross
+    @test_throws ArgumentError join(name, job)
 
     # Test output of various join types
-    outer = DataFrame(ID = [1, 2, 2, 3, 4],
-                      Name = @data(["John Doe", "Jane Doe", "Jane Doe", "Joe Blogs", NA]),
+    outer = DataFrame(Name = @data(["John Doe", "Jane Doe", "Jane Doe", "Joe Blogs", NA]),
+                      ID = [1, 2, 2, 3, 4],
                       Job = @data(["Lawyer", "Doctor", "Florist", NA, "Farmer"]))
 
     # (Tests use current column ordering but don't promote it)
     right = outer[!isna(outer[:Job]), [:Name, :ID, :Job]]
     left = outer[!isna(outer[:Name]), :]
     inner = left[!isna(left[:Job]), :]
-    semi = unique(inner[:, [:ID, :Name]])
-    anti = left[isna(left[:Job]), [:ID, :Name]]
+    semi = unique(inner[:, [:Name, :ID]])
+    anti = left[isna(left[:Job]), [:Name, :ID]]
 
     @test isequal(join(name, job, on = :ID), inner)
     @test isequal(join(name, job, on = :ID, kind = :inner), inner)
@@ -45,11 +44,34 @@ module TestJoin
     @test isequal(join(nameid, jobid, on = :ID, kind = :semi), semi[on])
     @test isequal(join(nameid, jobid, on = :ID, kind = :anti), anti[on])
 
+    # Join using pooled vectors
+    pname = DataFrame(Name = ["John Doe", "Jane Doe", "Joe Blogs"], ID = @pdata([1, 2, 3]))
+    pjob = DataFrame(ID = @pdata([1, 2, 2, 4]), Job = ["Lawyer", "Doctor", "Florist", "Farmer"])
+    pouter = DataFrame(Name = @data(["John Doe", "Jane Doe", "Jane Doe", "Joe Blogs", NA]),
+                      ID = @pdata([1, 2, 2, 3, 4]),
+                      Job = @data(["Lawyer", "Doctor", "Florist", NA, "Farmer"]))
+    pright = pouter[!isna(pouter[:Job]), [:Name, :ID, :Job]]
+    pleft = pouter[!isna(pouter[:Name]), :]
+    pinner = pleft[!isna(pleft[:Job]), :]
+    @test isequal(join(pname, pjob, on = :ID), pinner)
+    @test isequal(join(pname, pjob, on = :ID, kind = :inner), pinner)
+    @test isequal(join(pname, pjob, on = :ID, kind = :outer), pouter)
+    @test isequal(join(pname, pjob, on = :ID, kind = :left), pleft)
+    @test isequal(join(pname, pjob, on = :ID, kind = :right), pright)
+
     # Join on multiple keys
     df1 = DataFrame(A = 1, B = 2, C = 3)
     df2 = DataFrame(A = 1, B = 2, D = 4)
 
-    join(df1, df2, on = [:A, :B])
+    @test isequal(join(df1, df2, on = [:A, :B]),
+                  DataFrame(A = 1, B = 2, C = 3, D = 4))
+
+    # Join on multiple keys with different order of "on" columns
+    df1 = DataFrame(A = 1, B = :A, C = 3)
+    df2 = DataFrame(B = :A, A = 1, D = 4)
+
+    @test isequal(join(df1, df2, on = [:A, :B]),
+                  DataFrame(A = 1, B = :A, C = 3, D = 4))
 
     # Test output of cross joins
     df1 = DataFrame(A = 1:2, B = 'a':'b')
@@ -66,4 +88,28 @@ module TestJoin
 
     # Cross joins don't take keys
     @test_throws ArgumentError join(df1, df2, on = :A, kind = :cross)
+
+    # test empty inputs
+    simple_df(len::Int, col=:A) = (df = DataFrame(); df[col]=collect(1:len); df)
+    @test isequal(join(simple_df(0), simple_df(0), on = :A, kind = :left),  simple_df(0))
+    @test isequal(join(simple_df(2), simple_df(0), on = :A, kind = :left),  simple_df(2))
+    @test isequal(join(simple_df(0), simple_df(2), on = :A, kind = :left),  simple_df(0))
+    @test isequal(join(simple_df(0), simple_df(0), on = :A, kind = :right), simple_df(0))
+    @test isequal(join(simple_df(0), simple_df(2), on = :A, kind = :right), simple_df(2))
+    @test isequal(join(simple_df(2), simple_df(0), on = :A, kind = :right), simple_df(0))
+    @test isequal(join(simple_df(0), simple_df(0), on = :A, kind = :inner), simple_df(0))
+    @test isequal(join(simple_df(0), simple_df(2), on = :A, kind = :inner), simple_df(0))
+    @test isequal(join(simple_df(2), simple_df(0), on = :A, kind = :inner), simple_df(0))
+    @test isequal(join(simple_df(0), simple_df(0), on = :A, kind = :outer), simple_df(0))
+    @test isequal(join(simple_df(0), simple_df(2), on = :A, kind = :outer), simple_df(2))
+    @test isequal(join(simple_df(2), simple_df(0), on = :A, kind = :outer), simple_df(2))
+    @test isequal(join(simple_df(0), simple_df(0), on = :A, kind = :semi),  simple_df(0))
+    @test isequal(join(simple_df(2), simple_df(0), on = :A, kind = :semi),  simple_df(0))
+    @test isequal(join(simple_df(0), simple_df(2), on = :A, kind = :semi),  simple_df(0))
+    @test isequal(join(simple_df(0), simple_df(0), on = :A, kind = :anti),  simple_df(0))
+    @test isequal(join(simple_df(2), simple_df(0), on = :A, kind = :anti),  simple_df(2))
+    @test isequal(join(simple_df(0), simple_df(2), on = :A, kind = :anti),  simple_df(0))
+    @test isequal(join(simple_df(0), simple_df(0, :B), kind = :cross), DataFrame(A=Int[], B=Int[]))
+    @test isequal(join(simple_df(0), simple_df(2, :B), kind = :cross), DataFrame(A=Int[], B=Int[]))
+    @test isequal(join(simple_df(2), simple_df(0, :B), kind = :cross), DataFrame(A=Int[], B=Int[]))
 end
